@@ -191,7 +191,7 @@
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script>
-  // Firebase الأول
+  // رابط Firebase الأول
   const DATABASE_URL = "https://tracker-gps-2f07e-default-rtdb.firebaseio.com";
 
   const statusText = document.getElementById("statusText");
@@ -200,8 +200,8 @@
   const lastUpdate = document.getElementById("lastUpdate");
   const coordsText = document.getElementById("coordsText");
 
-  let currentLat = 36.804611;
-  let currentLng = 5.843074;
+  let currentLat = 36.687346;
+  let currentLng = 2.756789;
 
   // إنشاء الخريطة
   const map = L.map("map").setView([currentLat, currentLng], 16);
@@ -245,11 +245,9 @@
 
   async function readData() {
     try {
-      // إضافة وقت عشوائي لمنع المتصفح من استعمال نسخة قديمة من البيانات
-      const response = await fetch(firebaseUrl("car") + "?t=" + Date.now());
+      // قراءة كل البيانات لأن engine داخل car و GPS خارج car
+      const response = await fetch(DATABASE_URL + "/.json?t=" + Date.now());
       const data = await response.json();
-
-      console.log("Firebase data:", data);
 
       if (!data) {
         connectionText.innerText = "لا توجد بيانات";
@@ -259,24 +257,13 @@
 
       connectionText.innerText = "متصل";
 
-      const engine = data.engine;
-
-      // يدعم الشكل الصحيح:
-      // car/gps/lat
-      // car/gps/lng
-      let lat = null;
-      let lng = null;
-
-      if (data.gps && typeof data.gps === "object") {
-        lat = parseFloat(data.gps.lat);
-        lng = parseFloat(data.gps.lng);
-      }
-
-      // احتياط إذا كانت lat و lng مباشرة داخل car
-      if (isNaN(lat) || isNaN(lng)) {
-        lat = parseFloat(data.lat);
-        lng = parseFloat(data.lng);
-      }
+      // الهيكلة الحالية:
+      // car/engine
+      // gps/lat
+      // gps/lng
+      const engine = data.car?.engine;
+      const lat = parseFloat(data.gps?.lat);
+      const lng = parseFloat(data.gps?.lng);
 
       if (engine === "ON") {
         statusText.innerText = "تعمل";
@@ -328,10 +315,9 @@
   // قراءة مباشرة عند فتح الصفحة
   readData();
 
-  // تحديث تلقائي كل 2 ثانية
+  // تحديث تلقائي كل ثانيتين
   setInterval(readData, 2000);
 
-  // إصلاح حجم الخريطة بعد تحميل الصفحة
   setTimeout(function () {
     map.invalidateSize();
   }, 1000);
