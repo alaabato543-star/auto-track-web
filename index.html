@@ -51,6 +51,7 @@
       color: #0f172a;
       border-radius: 0 0 22px 22px;
       box-shadow: 0 5px 18px rgba(0,0,0,0.25);
+      z-index: 5;
     }
 
     .status-card {
@@ -118,6 +119,12 @@
       background: linear-gradient(135deg, #dc2626, #ef4444);
     }
 
+    #btnFollow {
+      width: 100%;
+      margin-top: 10px;
+      background: linear-gradient(135deg, #2563eb, #38bdf8);
+    }
+
     .info {
       margin-top: 10px;
       font-size: 13px;
@@ -135,6 +142,18 @@
     .leaflet-popup-content {
       text-align: center;
       font-family: Arial, Tahoma, sans-serif;
+      line-height: 1.6;
+    }
+
+    .leaflet-popup-content a {
+      display: inline-block;
+      margin-top: 6px;
+      padding: 7px 10px;
+      border-radius: 8px;
+      background: #2563eb;
+      color: white;
+      text-decoration: none;
+      font-weight: bold;
     }
 
     @media (max-width: 600px) {
@@ -159,7 +178,7 @@
 
   <div class="header">
     <h1>نظام تتبع وتحكم السيارة</h1>
-    <p>Firebase + GPS + OpenStreetMap</p>
+    <p>Firebase + GPS + OpenTopoMap</p>
   </div>
 
   <div class="panel">
@@ -178,6 +197,8 @@
       <button id="btnOn">تشغيل</button>
       <button id="btnOff">إيقاف</button>
     </div>
+
+    <button id="btnFollow">تتبع السيارة على الخريطة</button>
 
     <div class="info" id="lastUpdate">آخر تحديث: ---</div>
     <div class="info" id="coordsText">الموقع: ---</div>
@@ -203,12 +224,22 @@
   let currentLat = 36.687346;
   let currentLng = 2.756789;
 
+  // التحكم في تتبع السيارة
+  let followCar = true;
+  let firstLoad = true;
+
   // إنشاء الخريطة
   const map = L.map("map").setView([currentLat, currentLng], 16);
 
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution: "© OpenStreetMap"
+  // عندما يقوم المستخدم بالزوم أو تحريك الخريطة، نوقف التتبع التلقائي
+  map.on("zoomstart dragstart", function () {
+    followCar = false;
+  });
+
+  // خريطة تضاريس مجانية OpenTopoMap
+  L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
+    maxZoom: 17,
+    attribution: "© OpenTopoMap © OpenStreetMap"
   }).addTo(map);
 
   const carIcon = L.icon({
@@ -280,13 +311,20 @@
         currentLng = lng;
 
         marker.setLatLng([currentLat, currentLng]);
-        map.setView([currentLat, currentLng], 17);
+
+        // لا نرجع الخريطة كل مرة إلا عند أول تحميل أو عند تفعيل التتبع
+        if (followCar || firstLoad) {
+          map.setView([currentLat, currentLng], 17);
+          firstLoad = false;
+        }
+
         map.invalidateSize();
 
         marker.bindPopup(
           "موقع السيارة<br>" +
           "Lat: " + currentLat + "<br>" +
-          "Lng: " + currentLng
+          "Lng: " + currentLng + "<br><br>" +
+          '<a target="_blank" href="https://www.google.com/maps?q=' + currentLat + ',' + currentLng + '">فتح في Google Maps</a>'
         );
 
         coordsText.innerText = "الموقع: " + currentLat + " , " + currentLng;
@@ -310,6 +348,12 @@
 
   document.getElementById("btnOff").onclick = function () {
     setEngine("OFF");
+  };
+
+  document.getElementById("btnFollow").onclick = function () {
+    followCar = true;
+    map.setView([currentLat, currentLng], 17);
+    marker.openPopup();
   };
 
   // قراءة مباشرة عند فتح الصفحة
