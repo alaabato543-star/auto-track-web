@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <title>Auto Track GPS</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Leaflet / OpenStreetMap -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, Tahoma, sans-serif;
+      direction: rtl;
+      background: linear-gradient(135deg, #0f172a, #1e3a8a);
+      color: #fff;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      padding: 18px 15px;
+      text-align: center;
+      background: rgba(15, 23, 42, 0.95);
+      box-shadow: 0 3px 15px rgba(0,0,0,0.35);
+    }
+
+    .header h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+
+    .header p {
+      margin: 6px 0 0;
+      color: #cbd5e1;
+      font-size: 14px;
+    }
+
+    .panel {
+      padding: 14px;
+      background: #f8fafc;
+      color: #0f172a;
+      border-radius: 0 0 22px 22px;
+      box-shadow: 0 5px 18px rgba(0,0,0,0.25);
+    }
+
+    .status-card {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: white;
+      border-radius: 16px;
+      padding: 14px;
+      margin-bottom: 12px;
+      box-shadow: 0 3px 12px rgba(0,0,0,0.12);
+    }
+
+    .status-title {
+      font-size: 15px;
+      color: #64748b;
+    }
+
+    .status-value {
+      font-size: 21px;
+      font-weight: bold;
+    }
+
+    .badge {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-left: 6px;
+      background: #94a3b8;
+    }
+
+    .badge.on {
+      background: #22c55e;
+      box-shadow: 0 0 12px #22c55e;
+    }
+
+    .badge.off {
+      background: #ef4444;
+      box-shadow: 0 0 12px #ef4444;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    button {
+      flex: 1;
+      border: none;
+      border-radius: 15px;
+      padding: 15px;
+      font-size: 18px;
+      font-weight: bold;
+      color: white;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    }
+
+    #btnOn {
+      background: linear-gradient(135deg, #16a34a, #22c55e);
+    }
+
+    #btnOff {
+      background: linear-gradient(135deg, #dc2626, #ef4444);
+    }
+
+    .info {
+      margin-top: 10px;
+      font-size: 13px;
+      color: #475569;
+      text-align: center;
+    }
+
+    #map {
+      flex: 1;
+      width: 100%;
+      min-height: 420px;
+      z-index: 1;
+    }
+
+    .leaflet-popup-content {
+      text-align: center;
+      font-family: Arial, Tahoma, sans-serif;
+    }
+
+    @media (max-width: 600px) {
+      .header h1 {
+        font-size: 21px;
+      }
+
+      button {
+        font-size: 16px;
+      }
+
+      #map {
+        min-height: 500px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="app">
+
+  <div class="header">
+    <h1>نظام تتبع وتحكم السيارة</h1>
+    <p>Firebase + GPS + OpenStreetMap</p>
+  </div>
+
+  <div class="panel">
+    <div class="status-card">
+      <div>
+        <div class="status-title">حالة السيارة</div>
+        <div class="status-value">
+          <span id="statusBadge" class="badge"></span>
+          <span id="statusText">جاري الاتصال...</span>
+        </div>
+      </div>
+      <div id="connectionText">---</div>
+    </div>
+
+    <div class="buttons">
+      <button id="btnOn">تشغيل</button>
+      <button id="btnOff">إيقاف</button>
+    </div>
+
+    <div class="info" id="lastUpdate">آخر تحديث: ---</div>
+  </div>
+
+  <div id="map"></div>
+
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+  // Firebase الأول
+  const DATABASE_URL = "https://tracker-gps-2f07e-default-rtdb.firebaseio.com";
+
+  const statusText = document.getElementById("statusText");
+  const statusBadge = document.getElementById("statusBadge");
+  const connectionText = document.getElementById("connectionText");
+  const lastUpdate = document.getElementById("lastUpdate");
+
+  let currentLat = 36.804611;
+  let currentLng = 5.843074;
+
+  // إنشاء الخريطة
+  const map = L.map("map").setView([currentLat, currentLng], 16);
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "© OpenStreetMap"
+  }).addTo(map);
+
+  const carIcon = L.icon({
+    iconUrl: "https://cdn-icons-png.flaticon.com/512/744/744465.png",
+    iconSize: [42, 42],
+    iconAnchor: [21, 42],
+    popupAnchor: [0, -40]
+  });
+
+  const marker = L.marker([currentLat, currentLng], { icon: carIcon }).addTo(map);
+  marker.bindPopup("موقع السيارة").openPopup();
+
+  function firebaseUrl(path) {
+    return DATABASE_URL + "/" + path + ".json";
+  }
+
+  async function setEngine(value) {
+    try {
+      await fetch(firebaseUrl("car/engine"), {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(value)
+      });
+
+      readData();
+    } catch (error) {
+      alert("فشل إرسال الأمر إلى Firebase");
+      console.error(error);
+    }
+  }
+
+  async function readData() {
+    try {
+      const response = await fetch(firebaseUrl("car"));
+      const data = await response.json();
+
+      if (!data) {
+        connectionText.innerText = "لا توجد بيانات";
+        return;
+      }
+
+      connectionText.innerText = "متصل";
+
+      const engine = data.engine;
+      const lat = parseFloat(data.gps?.lat);
+      const lng = parseFloat(data.gps?.lng);
+
+      if (engine === "ON") {
+        statusText.innerText = "تعمل";
+        statusText.style.color = "#16a34a";
+        statusBadge.className = "badge on";
+      } else {
+        statusText.innerText = "متوقفة";
+        statusText.style.color = "#dc2626";
+        statusBadge.className = "badge off";
+      }
+
+      if (!isNaN(lat) && !isNaN(lng)) {
+        currentLat = lat;
+        currentLng = lng;
+
+        marker.setLatLng([currentLat, currentLng]);
+        map.setView([currentLat, currentLng], 16);
+      }
+
+      const now = new Date();
+      lastUpdate.innerText = "آخر تحديث: " + now.toLocaleTimeString();
+
+    } catch (error) {
+      connectionText.innerText = "خطأ اتصال";
+      console.error(error);
+    }
+  }
+
+  document.getElementById("btnOn").onclick = function () {
+    setEngine("ON");
+  };
+
+  document.getElementById("btnOff").onclick = function () {
+    setEngine("OFF");
+  };
+
+  // قراءة مباشرة عند فتح الصفحة
+  readData();
+
+  // تحديث تلقائي كل 2 ثانية
+  setInterval(readData, 2000);
+</script>
+
+</body>
+</html>
