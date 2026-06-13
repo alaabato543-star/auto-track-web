@@ -32,6 +32,7 @@
       text-align: center;
       background: rgba(15, 23, 42, 0.95);
       box-shadow: 0 3px 15px rgba(0,0,0,0.35);
+      z-index: 10;
     }
 
     .header h1 {
@@ -51,7 +52,7 @@
       color: #0f172a;
       border-radius: 0 0 22px 22px;
       box-shadow: 0 5px 18px rgba(0,0,0,0.25);
-      z-index: 5;
+      z-index: 10;
     }
 
     .status-card {
@@ -145,15 +146,19 @@
       line-height: 1.6;
     }
 
-    .leaflet-popup-content a {
+    .map-link {
       display: inline-block;
       margin-top: 6px;
-      padding: 7px 10px;
+      padding: 8px 10px;
       border-radius: 8px;
       background: #2563eb;
-      color: white;
+      color: white !important;
       text-decoration: none;
       font-weight: bold;
+    }
+
+    .osm-link {
+      background: #16a34a;
     }
 
     @media (max-width: 600px) {
@@ -224,19 +229,18 @@
   let currentLat = 36.687346;
   let currentLng = 2.756789;
 
-  // التحكم في تتبع السيارة
   let followCar = true;
   let firstLoad = true;
 
   // إنشاء الخريطة
   const map = L.map("map").setView([currentLat, currentLng], 16);
 
-  // عندما يقوم المستخدم بالزوم أو تحريك الخريطة، نوقف التتبع التلقائي
+  // عند الزوم أو تحريك الخريطة، لا نرجع تلقائيا كل ثانيتين
   map.on("zoomstart dragstart", function () {
     followCar = false;
   });
 
-  // خريطة تضاريس مجانية OpenTopoMap
+  // خريطة تضاريس مجانية
   L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
     maxZoom: 17,
     attribution: "© OpenTopoMap © OpenStreetMap"
@@ -250,11 +254,32 @@
   });
 
   const marker = L.marker([currentLat, currentLng], { icon: carIcon }).addTo(map);
-  marker.bindPopup("موقع السيارة").openPopup();
 
   function firebaseUrl(path) {
     return DATABASE_URL + "/" + path + ".json";
   }
+
+  function updatePopup() {
+    const googleMapsLink =
+      "https://www.google.com/maps/search/?api=1&query=" + currentLat + "," + currentLng;
+
+    const openStreetMapLink =
+      "https://www.openstreetmap.org/?mlat=" + currentLat +
+      "&mlon=" + currentLng +
+      "#map=18/" + currentLat + "/" + currentLng;
+
+    marker.bindPopup(
+      "موقع السيارة<br>" +
+      "Lat: " + currentLat + "<br>" +
+      "Lng: " + currentLng + "<br><br>" +
+      '<a class="map-link" href="' + googleMapsLink + '">فتح في Google Maps</a>' +
+      "<br>" +
+      '<a class="map-link osm-link" href="' + openStreetMapLink + '">فتح في OpenStreetMap</a>'
+    );
+  }
+
+  updatePopup();
+  marker.openPopup();
 
   async function setEngine(value) {
     try {
@@ -311,21 +336,15 @@
         currentLng = lng;
 
         marker.setLatLng([currentLat, currentLng]);
+        updatePopup();
 
-        // لا نرجع الخريطة كل مرة إلا عند أول تحميل أو عند تفعيل التتبع
+        // فقط في أول تحميل أو عند الضغط على زر تتبع السيارة
         if (followCar || firstLoad) {
           map.setView([currentLat, currentLng], 17);
           firstLoad = false;
         }
 
         map.invalidateSize();
-
-        marker.bindPopup(
-          "موقع السيارة<br>" +
-          "Lat: " + currentLat + "<br>" +
-          "Lng: " + currentLng + "<br><br>" +
-          '<a target="_blank" href="https://www.google.com/maps?q=' + currentLat + ',' + currentLng + '">فتح في Google Maps</a>'
-        );
 
         coordsText.innerText = "الموقع: " + currentLat + " , " + currentLng;
       } else {
